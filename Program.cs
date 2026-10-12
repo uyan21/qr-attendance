@@ -53,6 +53,8 @@ static class Program
                 using var card = Core.MakeCard(p);
                 log.AppendLine($"{p.Name} {p.Phone} {p.Token} decode={(Camera.Decode(card) == p.Token)}");
             }
+            using (var card = Core.MakeCard(people[0]))
+                log.Append(Camera.Probe(card, people[0].Token));
             Core.SaveCards(people, Path.Combine(dir, "qr"));
             var r1 = Core.Mark(people[0].Id, out var t1);
             var r2 = Core.Mark(people[0].Id, out _);
