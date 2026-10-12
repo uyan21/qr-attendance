@@ -168,8 +168,10 @@ static class Core
     }
 
     /// <summary>이미 있으면 false (기존 QR 유지)</summary>
-    static bool AddPerson(string name, string phone)
+    public static bool AddPerson(string name, string phone)
     {
+        name = (name ?? "").Trim();
+        phone = NormPhone(phone);
         if (Scalar("SELECT 1 FROM people WHERE name=@p0 AND phone=@p1", name, phone) != null) return false;
         while (true)
         {
@@ -182,6 +184,26 @@ static class Core
                 return true;
             }
             catch (SqliteException e) when (e.SqliteErrorCode == 19) { }
+        }
+    }
+
+    /// <summary>같은 이름+번호인 다른 사람이 있으면 false. QR(token)은 그대로</summary>
+    public static bool UpdatePerson(long id, string name, string phone)
+    {
+        name = (name ?? "").Trim();
+        phone = NormPhone(phone);
+        if (Scalar("SELECT 1 FROM people WHERE name=@p0 AND phone=@p1 AND id<>@p2", name, phone, id) != null) return false;
+        Exec("UPDATE people SET name=@p0, phone=@p1 WHERE id=@p2", name, phone, id);
+        return true;
+    }
+
+    /// <summary>출석 기록도 함께 삭제</summary>
+    public static void DeletePeople(IEnumerable<long> ids)
+    {
+        foreach (var id in ids)
+        {
+            Exec("DELETE FROM attendance WHERE person_id=@p0", id);
+            Exec("DELETE FROM people WHERE id=@p0", id);
         }
     }
 

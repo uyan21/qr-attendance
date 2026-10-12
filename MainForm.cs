@@ -86,6 +86,7 @@ class MainForm : Form
         }
         snapshotDir = dir;
         ShowRosterHelp();
+        PersonDialog("명단 수정", "홍길동", "010-1234-5678");
         snapshotDir = null;
         OpenFullscreen();
         var gray = new Bitmap(1280, 720);
@@ -466,6 +467,8 @@ class MainForm : Form
         gridBox.Margin = new Padding(0, S(4), S(6), 0);
         bar.Controls.Add(perPage);
         bar.Controls.Add(Btn("QR JPG 저장", SaveCards, Kind.Secondary));
+        bar.Controls.Add(Btn("명단 추가", AddPerson, Kind.Secondary));
+        bar.Controls.Add(Btn("선택한 명단 삭제", DeletePeople, Kind.Secondary));
 
         // 체크한 사람만 인쇄/저장. 처음엔 전원 체크
         var pick = new FlowLayoutPanel { Dock = DockStyle.Top, Height = S(40), WrapContents = false, Padding = new Padding(S(12), S(6), 0, 0) };
@@ -484,10 +487,19 @@ class MainForm : Form
         rosterGrid.Columns.Insert(0, new DataGridViewCheckBoxColumn { HeaderText = "선택", FillWeight = 10 });
         rosterGrid.DefaultCellStyle.SelectionBackColor = Color.White; // 행 강조 대신 체크박스로만 선택을 표시
         rosterGrid.Cursor = Cursors.Hand;
+        var editCol = new DataGridViewTextBoxColumn { HeaderText = "수정", FillWeight = 10 };
+        editCol.DefaultCellStyle.ForeColor = editCol.DefaultCellStyle.SelectionForeColor = Theme.Accent;
+        editCol.DefaultCellStyle.Font = new Font(Core.FontName, 10, FontStyle.Bold);
+        rosterGrid.Columns.Add(editCol);
         void Toggle(object s, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
             var row = rosterGrid.Rows[e.RowIndex];
+            if (e.ColumnIndex == editCol.Index)
+            {
+                EditPerson(row);
+                return;
+            }
             SetPicked(row, !(bool)row.Cells[0].Value);
             UpdatePick();
         }
@@ -508,6 +520,7 @@ class MainForm : Form
             ("3. QR을 만들 사람 고르기", "명단 왼쪽의 체크가 켜진 사람만 QR이 만들어집니다. 처음에는 모두 켜져 있습니다.\n한 사람씩 누르면 켜고 끌 수 있고, [전체 선택]으로 한꺼번에 켜고 끕니다."),
             ("4. QR코드 인쇄", "[A4 1장당]에서 한 장에 몇 개를 넣을지 고른 뒤 [③ QR코드 인쇄]를 누릅니다.\n미리보기 창이 뜨면 왼쪽 위의 프린터 그림을 눌러 인쇄합니다."),
             ("5. QR JPG 저장", "[QR JPG 저장]을 누르고 폴더를 고르면 한 사람당 그림 파일 하나(이름.jpg)로 저장됩니다.\n핸드폰에 넣어 두고 화면을 카메라에 대도 출석이 됩니다."),
+            ("6. 명단 추가 · 수정 · 삭제", "[명단 추가]로 한 명씩 직접 등록할 수 있습니다.\n명단 오른쪽 끝의 [수정]을 누르면 이름과 핸드폰번호를 고칩니다. QR은 바뀌지 않습니다.\n지울 사람만 체크하고 [선택한 명단 삭제]를 누르면 출석 기록까지 함께 지워지며 되돌릴 수 없습니다."),
         };
         using var dlg = new Form
         {
@@ -546,7 +559,7 @@ class MainForm : Form
         var rows = Core.Query(@"SELECT p.id, p.name, p.phone, COUNT(a.id), COALESCE(MAX(a.day), '')
                                 FROM people p LEFT JOIN attendance a ON a.person_id=p.id
                                 GROUP BY p.id ORDER BY p.name, p.phone");
-        Fill(rosterGrid, rows.Select(r => ((long)r[0], new[] { !unpicked.Contains((long)r[0]), r[1], r[2], r[3], r[4] })));
+        Fill(rosterGrid, rows.Select(r => ((long)r[0], new[] { !unpicked.Contains((long)r[0]), r[1], r[2], r[3], r[4], "수정" })));
         UpdatePick();
     }
 
@@ -598,6 +611,97 @@ class MainForm : Form
         {
             MessageBox.Show(e.Message, "업로드 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <returns>취소하면 null</returns>
+    (string name, string phone)? PersonDialog(string caption, string name, string phone)
+    {
+        using var dlg = new Form
+        {
+            Text = caption, Icon = Icon, Font = Font, BackColor = Color.White, FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false, StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(S(380), S(190)),
+        };
+        TextBox Field(string label, string value, int y)
+        {
+            dlg.Controls.Add(new Label { Text = label, AutoSize = true, Location = new Point(S(24), y + S(5)) });
+            var box = new TextBox { Text = value, Location = new Point(S(120), y), Width = S(236), Font = new Font(Core.FontName, 11) };
+            dlg.Controls.Add(box);
+            return box;
+        }
+        var nameBox = Field("이름", name, S(26));
+        var phoneBox = Field("핸드폰번호", phone, S(72));
+        var ok = Btn("저장", () =>
+        {
+            if (nameBox.Text.Trim() == "")
+            {
+                MessageBox.Show(dlg, "이름을 입력하세요.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            dlg.DialogResult = DialogResult.OK;
+        });
+        var cancel = Btn("취소", dlg.Close, Kind.Secondary);
+        ok.AutoSize = cancel.AutoSize = false;
+        ok.Size = cancel.Size = new Size(S(100), S(38));
+        cancel.Location = new Point(dlg.ClientSize.Width - S(24) - cancel.Width, S(128));
+        ok.Location = new Point(cancel.Left - S(8) - ok.Width, S(128));
+        dlg.Controls.Add(ok);
+        dlg.Controls.Add(cancel);
+        dlg.AcceptButton = ok;
+        dlg.CancelButton = cancel;
+        if (snapshotDir != null)
+        {
+            dlg.Shown += (_, _) =>
+            {
+                using var bmp = new Bitmap(dlg.Width, dlg.Height);
+                dlg.DrawToBitmap(bmp, new Rectangle(Point.Empty, dlg.Size));
+                bmp.Save(Path.Combine(snapshotDir, "person.png"));
+                dlg.Close();
+            };
+        }
+        return dlg.ShowDialog(this) == DialogResult.OK ? (nameBox.Text, phoneBox.Text) : null;
+    }
+
+    void AddPerson()
+    {
+        var input = PersonDialog("명단 추가", "", "");
+        if (input == null) return;
+        if (!Core.AddPerson(input.Value.name, input.Value.phone))
+        {
+            MessageBox.Show("이름과 핸드폰번호가 같은 사람이 이미 등록되어 있습니다.", "명단 추가", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        RefreshRoster();
+        RefreshToday();
+    }
+
+    void EditPerson(DataGridViewRow row)
+    {
+        var input = PersonDialog("명단 수정", (string)row.Cells[1].Value, (string)row.Cells[2].Value);
+        if (input == null) return;
+        if (!Core.UpdatePerson((long)row.Tag, input.Value.name, input.Value.phone))
+        {
+            MessageBox.Show("이름과 핸드폰번호가 같은 사람이 이미 등록되어 있습니다.", "명단 수정", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        RefreshRoster();
+        RefreshToday();
+    }
+
+    void DeletePeople()
+    {
+        var ids = PickedIds();
+        if (ids.Count == 0)
+        {
+            MessageBox.Show("삭제할 사람을 체크하세요.", "명단 삭제", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        var who = ids.Count == rosterGrid.Rows.Count ? $"명단 전체({ids.Count}명)" : $"체크한 {ids.Count}명";
+        if (MessageBox.Show($"{who}을 삭제할까요?\n이 사람들의 출석 기록도 함께 지워지며 되돌릴 수 없습니다.", "명단 삭제",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+        Core.DeletePeople(ids);
+        RefreshRoster();
+        RefreshToday();
     }
 
     List<Person> CardTargets()
