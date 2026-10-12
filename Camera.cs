@@ -41,6 +41,7 @@ class Camera
                 }
                 string text = "";
                 try { text = det.DetectAndDecode(frame, out _) ?? ""; } catch (OpenCVException) { }
+                Cv2.Flip(frame, frame, FlipMode.Y);
                 onFrame(BitmapConverter.ToBitmap(frame), text);
             }
         }
