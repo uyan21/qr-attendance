@@ -1,5 +1,6 @@
 using System.Drawing.Text;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
@@ -65,6 +66,17 @@ static class Core
                 at TEXT NOT NULL,
                 UNIQUE(person_id, day)
             );");
+        // 예전 버전이 난수로 만든 QR 값을 이름+번호 다이제스트로 바꿈
+        foreach (var p in People())
+            if (p.Token != Token(p.Name, p.Phone))
+                Exec("UPDATE people SET token=@p0 WHERE id=@p1", Token(p.Name, p.Phone), p.Id);
+    }
+
+    /// <summary>QR에 넣는 값: SHA-256(이름|번호 숫자)에서 뽑은 16자리 숫자. 어느 PC에서 등록해도 같은 값</summary>
+    public static string Token(string name, string phone)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(name.Trim() + "|" + Regex.Replace(phone ?? "", @"\D", "")));
+        return (BitConverter.ToUInt64(hash, 0) % 10_000_000_000_000_000UL).ToString("D16");
     }
 
     public static void Close()
@@ -167,33 +179,24 @@ static class Core
         return s;
     }
 
-    /// <summary>이미 있으면 false (기존 QR 유지)</summary>
+    /// <summary>이미 있으면 false</summary>
     public static bool AddPerson(string name, string phone)
     {
         name = (name ?? "").Trim();
         phone = NormPhone(phone);
         if (Scalar("SELECT 1 FROM people WHERE name=@p0 AND phone=@p1", name, phone) != null) return false;
-        while (true)
-        {
-            // 개인정보는 QR에 넣지 않고 임의의 숫자만 넣음
-            var token = string.Concat(Enumerable.Range(0, 10).Select(_ => RandomNumberGenerator.GetInt32(10)));
-            try
-            {
-                Exec("INSERT INTO people(name, phone, token, created) VALUES(@p0,@p1,@p2,@p3)",
-                    name, phone, token, DateTime.Now.ToString("s"));
-                return true;
-            }
-            catch (SqliteException e) when (e.SqliteErrorCode == 19) { }
-        }
+        Exec("INSERT INTO people(name, phone, token, created) VALUES(@p0,@p1,@p2,@p3)",
+            name, phone, Token(name, phone), DateTime.Now.ToString("s"));
+        return true;
     }
 
-    /// <summary>같은 이름+번호인 다른 사람이 있으면 false. QR(token)은 그대로</summary>
+    /// <summary>같은 이름+번호인 다른 사람이 있으면 false. 이름이나 번호가 바뀌면 QR 값도 바뀜</summary>
     public static bool UpdatePerson(long id, string name, string phone)
     {
         name = (name ?? "").Trim();
         phone = NormPhone(phone);
         if (Scalar("SELECT 1 FROM people WHERE name=@p0 AND phone=@p1 AND id<>@p2", name, phone, id) != null) return false;
-        Exec("UPDATE people SET name=@p0, phone=@p1 WHERE id=@p2", name, phone, id);
+        Exec("UPDATE people SET name=@p0, phone=@p1, token=@p2 WHERE id=@p3", name, phone, Token(name, phone), id);
         return true;
     }
 

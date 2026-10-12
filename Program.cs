@@ -78,7 +78,11 @@ static class Program
             log.AppendLine($"add {Core.AddPerson(" 이영희 ", "1055556666")} / add dup {Core.AddPerson("이영희", "010-5555-6666")}");
             log.AppendLine($"update {Core.UpdatePerson(hong.Id, "홍길순", "01012345678")} / update dup {Core.UpdatePerson(hong.Id, "이영희", "01055556666")}");
             var after = Core.People().First(p => p.Id == hong.Id);
-            log.AppendLine($"updated {after.Name} {after.Phone} token same={after.Token == hong.Token}");
+            log.AppendLine($"updated {after.Name} {after.Phone} token changed={after.Token != hong.Token} digest={after.Token == Core.Token("홍길순", "010-1234-5678")} {Core.Token(" 홍길순", "01012345678")}");
+            Core.Exec("UPDATE people SET token='1234567890' WHERE id=@p0", hong.Id);
+            Core.Close();
+            Core.Open();
+            log.AppendLine($"migrate old random token={Core.People().First(p => p.Id == hong.Id).Token == after.Token}");
             Core.DeletePeople(new[] { hong.Id });
             log.AppendLine($"delete people={Core.People().Count} hong att={Core.Scalar("SELECT COUNT(*) FROM attendance WHERE person_id=@p0", hong.Id)} names={string.Join(",", Core.People().Select(p => p.Name))}");
             Core.Close();
