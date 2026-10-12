@@ -11,7 +11,7 @@
     <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
     <SatelliteResourceLanguages>ko</SatelliteResourceLanguages>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +27,7 @@
   <ItemGroup>
     <EmbeddedResource Include="fonts\Jua-Regular.ttf" LogicalName="Jua.ttf" />
     <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+    <EmbeddedResource Include="패치노트.txt" LogicalName="notes.txt" />
   </ItemGroup>
 
 </Project>

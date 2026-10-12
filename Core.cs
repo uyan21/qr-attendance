@@ -14,6 +14,9 @@ enum MarkResult { Ok, Already }
 
 static class Core
 {
+    /// <summary>예: v1.4 (csproj의 Version)</summary>
+    public static readonly string Version = "v" + typeof(Core).Assembly.GetName().Version.ToString(2);
+
     public static string DataDir = Path.Combine(AppContext.BaseDirectory, "data");
     public static string DbPath => Path.Combine(DataDir, "attendance.db");
     public const string FontName = "맑은 고딕";

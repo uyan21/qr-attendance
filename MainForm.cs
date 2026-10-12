@@ -37,7 +37,7 @@ class MainForm : Form
 
     public MainForm()
     {
-        Text = "QR 출석";
+        Text = "QR 출석 " + Core.Version;
         using (var ico = typeof(MainForm).Assembly.GetManifestResourceStream("app.ico")) Icon = new Icon(ico);
         Font = new Font(Core.FontName, 10.5f);
         BackColor = Theme.Bg;
@@ -87,6 +87,7 @@ class MainForm : Form
         snapshotDir = dir;
         ShowRosterHelp();
         PersonDialog("명단 수정", "홍길동", "010-1234-5678");
+        ShowNotes();
         snapshotDir = null;
         OpenFullscreen();
         var gray = new Bitmap(1280, 720);
@@ -105,6 +106,16 @@ class MainForm : Form
             Text = "개인정보는 이 PC에만\n저장됩니다", Dock = DockStyle.Bottom, Height = S(64), ForeColor = Theme.Muted,
             Font = new Font(Core.FontName, 9), TextAlign = ContentAlignment.MiddleCenter,
         });
+        var notes = new Button
+        {
+            Text = Core.Version + " · 패치노트", Dock = DockStyle.Bottom, Height = S(40), FlatStyle = FlatStyle.Flat, ForeColor = Theme.SideText,
+            Cursor = Cursors.Hand, Font = new Font(Core.FontName, 9.5f, FontStyle.Bold), TabStop = false,
+        };
+        notes.FlatAppearance.BorderSize = 0;
+        notes.FlatAppearance.MouseOverBackColor = Theme.SideActive;
+        notes.FlatAppearance.MouseDownBackColor = Theme.SideActive;
+        notes.Click += (_, _) => ShowNotes();
+        side.Controls.Add(notes);
         string[] names = { "출석 체크", "명단 · QR 생성", "전체 출석일 내보내기" };
         for (int i = names.Length - 1; i >= 0; i--)
         {
@@ -128,6 +139,35 @@ class MainForm : Form
             Font = new Font(Core.FontName, 20, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(S(20), 0, 0, 0),
         });
         return side;
+    }
+
+    void ShowNotes()
+    {
+        using var dlg = new Form
+        {
+            Text = "패치노트 (현재 " + Core.Version + ")", Icon = Icon, Font = Font, BackColor = Color.White, FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false, StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(S(680), S(560)), Padding = new Padding(S(16)),
+        };
+        using var stream = typeof(MainForm).Assembly.GetManifestResourceStream("notes.txt");
+        using var reader = new StreamReader(stream);
+        var box = new TextBox
+        {
+            Text = reader.ReadToEnd().Replace("\r", "").Replace("\n", "\r\n"), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            Dock = DockStyle.Fill, BackColor = Color.White, BorderStyle = BorderStyle.None, TabStop = false,
+        };
+        dlg.Controls.Add(box);
+        if (snapshotDir != null)
+        {
+            dlg.Shown += (_, _) =>
+            {
+                using var bmp = new Bitmap(dlg.Width, dlg.Height);
+                dlg.DrawToBitmap(bmp, new Rectangle(Point.Empty, dlg.Size));
+                bmp.Save(Path.Combine(snapshotDir, "notes.png"));
+                dlg.Close();
+            };
+        }
+        dlg.ShowDialog(this);
     }
 
     Panel NewPage(string title)
