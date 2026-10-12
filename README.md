@@ -37,7 +37,7 @@
 | UI | Windows Forms (디자이너 없이 코드로 구성, 직접 그린 버튼·배너·스캔 가이드) |
 | 저장소 | SQLite (`Microsoft.Data.Sqlite`) |
 | 엑셀 | ClosedXML |
-| 웹캠 · QR 인식 | OpenCvSharp4 (`VideoCapture`, `QRCodeDetector`) |
+| 웹캠 · QR 인식 | OpenCvSharp4 (`VideoCapture`, `QRCodeDetector`) + ZXing.Net (두 인식기를 함께 사용) |
 | QR 생성 | QRCoder |
 | 인쇄 | `PrintDocument` + `PrintPreviewDialog` |
 
